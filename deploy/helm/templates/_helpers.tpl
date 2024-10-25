@@ -333,3 +333,14 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- .Values.image.registry }}
 {{- end}}
 {{- end}}
+
+{{/*
+Define the replica count for kubeblocks.
+*/}}
+{{- define "kubeblocks.replicaCount" }}
+{{- if and .Values.admissionWebhooks.conversionEnabled .Release.IsInstall }}
+{{- print 0 }}
+{{- else }}
+{{- .Values.replicaCount }}
+{{- end}}
+{{- end}}

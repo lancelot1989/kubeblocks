@@ -1,4 +1,5 @@
 # gcs-s3comp is a storage provider for [Google Cloud Storage](https://cloud.google.com/storage/), by using its S3-compatible API.
+{{- if (include "dataprotection.installStorageProvider" "gcs-s3comp") }}
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
@@ -94,3 +95,4 @@ spec:
     credentialFields:
       - accessKeyId
       - secretAccessKey
+{{- end }}

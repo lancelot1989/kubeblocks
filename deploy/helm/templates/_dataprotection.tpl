@@ -61,3 +61,12 @@ Render the algorithm for backup encryption, empty if not specified or invalid.
     {{ "" | quote }}
   {{- end -}}
 {{- end }}
+
+
+{{- define "dataprotection.installStorageProvider" -}}
+{{- $existingSP := lookup "dataprotection.kubeblocks.io/v1alpha1" "StorageProvider" "" . -}}
+{{- if and $existingSP .Release.IsInstall }}
+{{- print false }}
+{{- else -}}
+{{- print true }}
+{{- end -}}

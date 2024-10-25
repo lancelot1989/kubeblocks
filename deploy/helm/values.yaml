@@ -2008,7 +2008,4 @@ vmagent:
             regex: Pending|Succeeded|Failed|Completed
             action: drop
 
-crd:
-  enabled: true
-
 userAgent: kubeblocks
