@@ -637,32 +637,15 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 }
 
 func (r *componentWorkloadOps) recordPodForMemberJoin() error {
+	var podToMemberjoin []string
 	for podName := range r.desiredCompPodNameSet {
 		if _, ok := r.runningItsPodNameSet[podName]; ok {
 			continue
 		}
-		r.protoITS.Status = markMemberJoinStatus(r.protoITS.Status, podName, lifecycle.MemberJoinProcessing)
+		podToMemberjoin = append(podToMemberjoin, podName)
 	}
-
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podToMemberjoin, ",")
 	return nil
-}
-
-func markMemberJoinStatus(itsStatus workloads.InstanceSetStatus, podName string, status lifecycle.MemberJoinStatus) workloads.InstanceSetStatus {
-	lfaStatus := itsStatus.LifecycleActionsStatus
-	if lfaStatus == nil {
-		lfaStatus = make(map[string]workloads.ActionStatus)
-	}
-
-	if _, ok := lfaStatus[podName]; !ok {
-		lfaStatus[podName] = workloads.ActionStatus{MemberLeaveStatus: status.String()}
-	} else {
-		mlStatus := lfaStatus[podName]
-		mlStatus.MemberLeaveStatus = status.String()
-		lfaStatus[podName] = mlStatus
-	}
-
-	itsStatus.LifecycleActionsStatus = lfaStatus
-	return itsStatus
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
@@ -979,13 +962,17 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	if err != nil {
 		return err
 	}
-	actionStatus := r.runningITS.Status.LifecycleActionsStatus
-	if actionStatus == nil {
+	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
+	if memberJoinStatus == "" {
 		return nil
 	}
-	for _, pod := range pods {
 
-		if actionStatus[pod.Name].MemberLeaveStatus != lifecycle.MemberJoinProcessing.String() {
+	podsToMemberJoin := sets.New(strings.Split(memberJoinStatus, ",")...)
+	for _, pod := range pods {
+		if _, ok := podsToMemberJoin[pod.Name]; !ok {
+			continue
+		}
+		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
 		lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
@@ -995,12 +982,14 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 
 		if err2 := lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
 			if !errors.Is(err2, lifecycle.ErrActionNotDefined) && err == nil {
-
+				err = err2
 			}
+		} else {
+			podsToMemberJoin.Delete(pod.Name)
 		}
-		markMemberJoinStatus(r.runningITS.Status, pod.Name, lifecycle.MemberJoinCompleted)
 	}
-	return nil
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberJoin.UnsortedList(), ",")
+	return err
 }
 
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
