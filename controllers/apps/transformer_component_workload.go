@@ -980,8 +980,8 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 			return err
 		}
 
-		if err2 := lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
-			if !errors.Is(err2, lifecycle.ErrActionNotDefined) && err == nil {
+		if err2 := lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err2 != nil && !errors.Is(err2, lifecycle.ErrActionNotDefined) {
+			if err == nil {
 				err = err2
 			}
 		} else {
