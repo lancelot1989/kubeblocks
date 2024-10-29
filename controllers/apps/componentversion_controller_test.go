@@ -672,4 +672,58 @@ var _ = Describe("ComponentVersion Controller", func() {
 			updateNCheckCompDefinitionImages(compDef, resolvedServiceVersion, "r3", "r2")
 		})
 	})
+
+	Context("#8058", func() {
+		It("service version", func() {
+			cmpd := testapps.NewComponentDefinitionFactory("test-compdef-8058").
+				SetRuntime(&corev1.Container{Name: "app"}).
+				Create(&testCtx).
+				GetObject()
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cmpd),
+				func(g Gomega, compDef *appsv1.ComponentDefinition) {
+					g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
+				})).Should(Succeed())
+
+			cmpv := testapps.NewComponentVersionFactory("test-cmpv-8058").
+				SetSpec(appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
+						{
+							CompDefs: []string{"test-compdef-8058"},
+							Releases: []string{"0.4.4"},
+						},
+						{
+							CompDefs: []string{"test-compdef-8058"},
+							Releases: []string{"0.5.4"},
+						},
+					},
+					Releases: []appsv1.ComponentVersionRelease{
+						{
+							Name:           "0.4.4",
+							ServiceVersion: "0.4.4",
+							Images: map[string]string{
+								"app": "image:0.4.4",
+							},
+						},
+						{
+							Name:           "0.5.4",
+							ServiceVersion: "0.4.4-test",
+							Images: map[string]string{
+								"app": "image:0.4.4-test",
+							},
+						},
+					},
+				}).
+				Create(&testCtx).
+				GetObject()
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cmpv),
+				func(g Gomega, compVersion *appsv1.ComponentVersion) {
+					g.Expect(compVersion.Status.ObservedGeneration).Should(Equal(compVersion.Generation))
+				})).Should(Succeed())
+
+			compDef, resolvedServiceVersion, err := resolveCompDefinitionNServiceVersion(testCtx.Ctx, testCtx.Cli, "", "0.4.4")
+			Expect(err).Should(Succeed())
+			Expect(compDef.Name).Should(Equal("test-compdef-8058"))
+			Expect(resolvedServiceVersion).Should(Equal("0.4.4"))
+		})
+	})
 })
